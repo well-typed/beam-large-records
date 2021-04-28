@@ -1,0 +1,12 @@
+cabal-version:      2.4
+name:               beam-large-records
+version:            0.1.0.0
+author:             Andres Loeh
+maintainer:         andres@well-typed.com
+extra-source-files: CHANGELOG.md
+
+library
+    exposed-modules:  BeamLR, BeamLR2, BeamSOP
+    build-depends:    base ^>=4.14.1.0, beam-core, generics-sop, large-records, vector, sop-core
+    hs-source-dirs:   src
+    default-language: Haskell2010
