@@ -135,8 +135,6 @@ gzipBeamFieldsM ::
   , IsProductType (tbl g) ys
   , IsProductType (tbl h) zs
   , IsProductType (tbl Exposed) bs
-  , IsProductType (tbl Exposed) bs
-  , IsProductType (tbl Exposed) bs
   , AllZip (CheckBeamField f) xs bs
   , AllZip (CheckBeamField g) ys bs
   , AllZip (Flip (CheckBeamField h)) bs zs
