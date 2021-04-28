@@ -19,7 +19,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module BeamLR where
+module Data.Records.Generic.Beam where
 
 import Data.Kind
 import Data.Record.Generic
