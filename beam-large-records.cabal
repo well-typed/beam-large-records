@@ -6,7 +6,7 @@ maintainer:         andres@well-typed.com
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules:  Data.Records.Generic.Beam
+    exposed-modules:  Data.Record.Generic.Beam
     build-depends:    base >= 4.13,
                       beam-core,
                       large-records
