@@ -19,8 +19,12 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators #-}
 module Data.Record.Generic.Beam where
 
+import Data.Bifunctor
+import Data.Char
 import Data.Kind
 import Data.Record.Generic
 import Data.Record.Generic.Show
@@ -31,6 +35,9 @@ import Unsafe.Coerce
 import Control.Applicative
 import Data.Coerce
 import qualified GHC.Generics as GHC
+import qualified Data.Text as T
+import Lens.Micro ((%~))
+import GHC.TypeLits
 
 -- * Beamable
 
@@ -226,47 +233,54 @@ gtblSkeleton =
 
 -- * Database
 
-data DatabaseField :: Type -> (Type -> Type) -> Type -> Type where
-  DatabaseEntityField :: (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> DatabaseField be f (Exposed tbl)
+data Reqs = DefaultReqs | RegularReqs | LRReqs
+
+type family InterpretReqs (reqs :: Reqs) (be :: Type) (tbl :: Type) :: Constraint where
+  -- InterpretReqs 'DefaultReqs be tbl = DatabaseEntityDefaultRequirements be tbl
+  InterpretReqs 'LRReqs      be tbl = DatabaseEntityLRRequirements      be tbl
+  InterpretReqs 'RegularReqs be tbl = DatabaseEntityRegularRequirements be tbl
+
+data DatabaseField :: Reqs -> Type -> (Type -> Type) -> Type -> Type where
+  DatabaseEntityField :: (IsDatabaseEntity be tbl, InterpretReqs reqs be tbl) => f tbl -> DatabaseField reqs be f (Exposed tbl)
 
 combineDatabaseFields ::
-  forall be f g h m x.
+  forall reqs be f g h m x.
   (Applicative m)
-  => (forall tbl. (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> g tbl -> m (h tbl))
-  -> DatabaseField be f x -> DatabaseField be g x -> m (DatabaseField be h x)
+  => (forall tbl. (IsDatabaseEntity be tbl, InterpretReqs reqs be tbl) => f tbl -> g tbl -> m (h tbl))
+  -> DatabaseField reqs be f x -> DatabaseField reqs be g x -> m (DatabaseField reqs be h x)
 combineDatabaseFields combine (DatabaseEntityField f) (DatabaseEntityField g) = DatabaseEntityField <$> combine f g
 
-class CheckDatabaseField be (f :: Type -> Type) (tbl :: Type) where
+class CheckDatabaseField (reqs :: Reqs) be (f :: Type -> Type) (tbl :: Type) where
   type OriginalDatabaseType f tbl :: Type
-  checkDatabaseField :: OriginalDatabaseType f tbl -> DatabaseField be f tbl
-  uncheckDatabaseField :: DatabaseField be f tbl -> OriginalDatabaseType f tbl
+  checkDatabaseField :: OriginalDatabaseType f tbl -> DatabaseField reqs be f tbl
+  uncheckDatabaseField :: DatabaseField reqs be f tbl -> OriginalDatabaseType f tbl
 
-instance (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => CheckDatabaseField be f (Exposed tbl) where
+instance (IsDatabaseEntity be tbl, InterpretReqs reqs be tbl) => CheckDatabaseField reqs be f (Exposed tbl) where
   type OriginalDatabaseType f (Exposed tbl) = f tbl
   checkDatabaseField x = DatabaseEntityField x
   uncheckDatabaseField (DatabaseEntityField x) = x
 
-type CheckDatabaseFields be f (db :: (Type -> Type) -> Type) = (Constraints (db Exposed) (CheckDatabaseField be f))
+type CheckDatabaseFields reqs be f (db :: (Type -> Type) -> Type) = (Constraints (db Exposed) (CheckDatabaseField reqs be f))
 
 newtype D f tbl = D { unD :: OriginalDatabaseType f tbl }
 
-dbExpose :: CheckDatabaseFields be f db => Rep I (db f) -> Rep (D f) (db Exposed)
+dbExpose :: CheckDatabaseFields reqs be f db => Rep I (db f) -> Rep (D f) (db Exposed)
 dbExpose = unsafeCoerce
 {-# NOINLINE dbExpose #-}
 
-dbUnexpose :: CheckDatabaseFields be f db => Rep (D f) (db Exposed) -> Rep I (db f)
+dbUnexpose :: CheckDatabaseFields reqs be f db => Rep (D f) (db Exposed) -> Rep I (db f)
 dbUnexpose = unsafeCoerce
 {-# NOINLINE dbUnexpose #-}
 
 checkDatabaseFields ::
-  forall be f db. (Generic (db Exposed), CheckDatabaseFields be f db)
-  => Rep I (db f) -> Rep (DatabaseField be f) (db Exposed)
-checkDatabaseFields = R.cmap (Proxy @(CheckDatabaseField be f)) (checkDatabaseField . unD) . dbExpose @be
+  forall reqs be f db. (Generic (db Exposed), CheckDatabaseFields reqs be f db)
+  => Rep I (db f) -> Rep (DatabaseField reqs be f) (db Exposed)
+checkDatabaseFields = R.cmap (Proxy @(CheckDatabaseField reqs be f)) (checkDatabaseField . unD) . dbExpose @reqs @be
 
 uncheckDatabaseFields ::
-  forall be f db. (Generic (db Exposed), CheckDatabaseFields be f db)
-  => Rep (DatabaseField be f) (db Exposed) -> Rep I (db f)
-uncheckDatabaseFields = dbUnexpose @be . R.cmap (Proxy @(CheckDatabaseField be f)) (D . uncheckDatabaseField)
+  forall reqs be f db. (Generic (db Exposed), CheckDatabaseFields reqs be f db)
+  => Rep (DatabaseField reqs be f) (db Exposed) -> Rep I (db f)
+uncheckDatabaseFields = dbUnexpose @reqs @be . R.cmap (Proxy @(CheckDatabaseField reqs be f)) (D . uncheckDatabaseField)
 
 gzipTables ::
   forall be db f g h m.
@@ -275,9 +289,9 @@ gzipTables ::
   , Generic (db g)
   , Generic (db h)
   , Generic (db Exposed)
-  , CheckDatabaseFields be f db
-  , CheckDatabaseFields be g db
-  , CheckDatabaseFields be h db
+  , CheckDatabaseFields 'RegularReqs be f db
+  , CheckDatabaseFields 'RegularReqs be g db
+  , CheckDatabaseFields 'RegularReqs be h db
   )
   => Proxy be
   -> (forall tbl. (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> g tbl -> m (h tbl))
@@ -292,27 +306,201 @@ gzipTables_Rep ::
   , Generic (db g)
   , Generic (db h)
   , Generic (db Exposed)
-  , CheckDatabaseFields be f db
-  , CheckDatabaseFields be g db
-  , CheckDatabaseFields be h db
+  , CheckDatabaseFields 'RegularReqs be f db
+  , CheckDatabaseFields 'RegularReqs be g db
+  , CheckDatabaseFields 'RegularReqs be h db
   )
   => (forall tbl. (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> g tbl -> m (h tbl))
   -> Rep I (db f) -> Rep I (db g) -> m (Rep I (db h))
 gzipTables_Rep combine f g =
   let
-    ef :: Rep (DatabaseField be f) (db Exposed)
+    ef :: Rep (DatabaseField 'RegularReqs be f) (db Exposed)
     ef = checkDatabaseFields f
 
-    eg :: Rep (DatabaseField be g) (db Exposed)
+    eg :: Rep (DatabaseField 'RegularReqs be g) (db Exposed)
     eg = checkDatabaseFields g
 
-    eh :: m (Rep (DatabaseField be h) (db Exposed))
+    eh :: m (Rep (DatabaseField 'RegularReqs be h) (db Exposed))
     eh = R.zipWithM (combineDatabaseFields combine) ef eg
 
     h :: m (Rep I (db h))
     h = uncheckDatabaseFields <$> eh
   in
     h
+
+class AutoDbSetting be (tbl :: Type) where
+  autoDbSetting :: String -> DatabaseField 'LRReqs be (DatabaseEntity be db) tbl
+
+instance (IsDatabaseEntity' be tbl, DatabaseEntityLRRequirements be tbl) => AutoDbSetting be (Exposed tbl) where
+  autoDbSetting fname = DatabaseEntityField (DatabaseEntity (dbEntityLRAuto @be (T.pack fname)))
+  -- TODO: The use of `dbEntityAuto` here is wrong. It relies on `DatabaseEntityDefaultRequirements`,
+  -- which in turn relies on `GDefaultTableFieldSettings`, which works on the GHC.Generics representation
+  -- by using `defTblFieldSettings`. I think we have to replace these as well.
+
+class IsDatabaseEntity be entityType => IsDatabaseEntity' be entityType where
+  type DatabaseEntityLRRequirements be entityType :: Constraint
+  dbEntityLRAuto :: DatabaseEntityLRRequirements be entityType => T.Text -> DatabaseEntityDescriptor be entityType
+
+instance Beamable tbl => IsDatabaseEntity' be (TableEntity tbl) where
+  type DatabaseEntityLRRequirements be (TableEntity tbl) =
+    ( Table tbl
+    , Generic (tbl (TableField tbl))
+    , Constraints (tbl (TableField tbl)) CheckTblField
+    )
+  dbEntityLRAuto nm =
+    DatabaseTable Nothing nm (unCamelCaseSel nm) autoTblSettings
+
+instance Beamable tbl => IsDatabaseEntity' be (ViewEntity tbl) where
+  type DatabaseEntityLRRequirements be (ViewEntity tbl) =
+    ( Table tbl
+    , Generic (tbl (TableField tbl))
+    , Constraints (tbl (TableField tbl)) CheckTblField
+    )
+  dbEntityLRAuto nm =
+    DatabaseView Nothing nm (unCamelCaseSel nm) autoTblSettings
+
+instance IsDatabaseEntity' be (DomainTypeEntity ty) where
+  type DatabaseEntityLRRequirements be (DomainTypeEntity ty) = ()
+  dbEntityLRAuto =
+    DatabaseDomainType Nothing
+
+class CheckTblField a where
+  tblField :: T.Text -> a
+
+instance CheckTblField (TableField tbl a) where
+  tblField fname =
+    TableField (pure fname) (unCamelCaseSel fname)
+
+instance
+  ( ChooseSubTableStrategy tbl sub ~ strategy
+  , SubTableStrategyImpl strategy f sub
+  , TagReducesTo f (TableField tbl)
+  , Beamable sub
+  )
+  => CheckTblField (sub f) where
+  tblField origSelName =
+    let
+      tbl :: sub f
+      tbl = namedSubTable (Proxy @strategy)
+
+      relName :: T.Text
+      relName = unCamelCaseSel origSelName
+
+      settings' :: sub f
+      settings' =
+        changeBeamRep (reduceTag %~ \(Columnar' (TableField path nm)) -> Columnar' (TableField (pure origSelName <> path) (relName <> "__" <> nm))) tbl
+    in
+      settings'
+
+class SubTableStrategyImpl (strategy :: SubTableStrategy) (f :: Type -> Type) sub where
+  namedSubTable :: Proxy strategy -> sub f
+
+instance
+  ( Generic (sub f)
+  , Constraints (sub (TableField tbl)) CheckTblField
+  , f ~ TableField tbl
+  )
+  => SubTableStrategyImpl 'BeamableStrategy f sub where
+  namedSubTable _ = autoTblSettings
+
+instance
+  ( Generic (rel (TableField rel))
+  , Constraints (rel (TableField rel)) CheckTblField
+  , TagReducesTo f (TableField tbl)
+  , Table rel
+  )
+  => SubTableStrategyImpl 'PrimaryKeyStrategy f (PrimaryKey rel) where
+  namedSubTable _ =
+    primaryKey
+      (changeBeamRep
+        (\ (Columnar' (TableField path nm)) ->
+          unI (reduceTag (\ _ -> pure (Columnar' (TableField path nm))) undefined)
+        )
+        (autoTblSettings @rel @rel)
+      )
+
+instance
+  ( CheckNullable f
+  , SubTableStrategyImpl 'PrimaryKeyStrategy f (PrimaryKey rel)
+  )
+  => SubTableStrategyImpl 'RecursiveKeyStrategy f (PrimaryKey rel) where
+  namedSubTable _ =
+    namedSubTable (Proxy @'PrimaryKeyStrategy)
+
+autoTblSettings ::
+  forall tbl tbl'.
+  ( Generic (tbl (TableField tbl'))
+  , Constraints (tbl (TableField tbl')) CheckTblField
+  )
+  => tbl (TableField tbl')
+autoTblSettings =
+  let
+    fnames :: Rep (K String) (tbl (TableField tbl'))
+    fnames = recordFieldNames (metadata (Proxy @(tbl (TableField tbl'))))
+
+    tblFields :: Rep I (tbl (TableField tbl'))
+    tblFields = R.cmap (Proxy @CheckTblField) (\ (K n) -> I (tblField (T.pack n))) fnames
+  in
+    to tblFields
+
+autoDbSettings ::
+  forall be db.
+  ( Generic (db (DatabaseEntity be db))
+  , Generic (db Exposed)
+  , Constraints (db Exposed) (AutoDbSetting be)
+  , CheckDatabaseFields 'LRReqs be (DatabaseEntity be db) db
+  )
+  => DatabaseSettings be db
+autoDbSettings =
+  let
+    fnames :: Rep (K String) (db Exposed)
+    fnames = recordFieldNames (metadata (Proxy @(db Exposed)))
+
+    e :: Rep (DatabaseField 'LRReqs be (DatabaseEntity be db)) (db Exposed)
+    e = R.cmap (Proxy @(AutoDbSetting be)) (autoDbSetting . unK) fnames
+  in
+    to (uncheckDatabaseFields e)
+
+-- * Utilities (should be exported from Beam)
+
+unCamelCaseSel :: T.Text -> T.Text
+unCamelCaseSel original =
+  let symbolLeft = T.dropWhile (=='_') original
+  in if T.null symbolLeft
+     then original
+     else if T.any (=='_') symbolLeft
+          then symbolLeft
+          else case unCamelCase symbolLeft of
+                 [] -> symbolLeft
+                 [xs] -> xs
+                 _:xs -> T.intercalate "_" xs
+
+unCamelCase :: T.Text -> [T.Text]
+unCamelCase "" = []
+unCamelCase s
+    | (comp, next) <- T.break isUpper s, not (T.null comp) =
+          let next' = maybe mempty (uncurry T.cons . first toLower) (T.uncons next)
+          in T.toLower comp:unCamelCase next'
+    | otherwise =
+          let (comp, next) = T.span isUpper s
+              next' = maybe mempty (uncurry T.cons . first toLower) (T.uncons next)
+          in T.toLower comp:unCamelCase next'
+
+type family ChooseSubTableStrategy (tbl :: (Type -> Type) -> Type) (sub :: (Type -> Type) -> Type) :: SubTableStrategy where
+  ChooseSubTableStrategy tbl (PrimaryKey tbl) = 'RecursiveKeyStrategy
+  ChooseSubTableStrategy tbl (PrimaryKey rel) = 'PrimaryKeyStrategy
+  ChooseSubTableStrategy tbl sub = 'BeamableStrategy
+
+data SubTableStrategy
+  = PrimaryKeyStrategy
+  | BeamableStrategy
+  | RecursiveKeyStrategy
+
+type family CheckNullable (f :: Type -> Type) :: Constraint where
+  CheckNullable (Nullable f) = ()
+  CheckNullable f = TypeError ('Text "Recursive references without Nullable constraint form an infinite loop." ':$$:
+                               'Text "Hint: Only embed nullable 'PrimaryKey tbl' within the definition of 'tbl'." ':$$:
+                               'Text "      For example, replace 'PrimaryKey tbl f' with 'PrimaryKey tbl (Nullable f)'")
 
 -- * Example
 
@@ -335,7 +523,7 @@ largeRecord defaultLazyOptions [d|
          , fldB6 :: Columnar f String
          , fldB7 :: LRTableA f
          , fldB8 :: PrimaryKey LRTableA f
-         , fldB9 :: LRTableA (Nullable f)
+         , fldB9 :: PrimaryKey LRTableA (Nullable f)
          }
   |]
 
@@ -353,8 +541,23 @@ instance Show (LRTableA Maybe) where
 instance Show (LRTableA (Nullable Maybe)) where
   showsPrec = gshowsPrec
 
+instance Show (LRTableA (TableField tbl)) where
+  showsPrec = gshowsPrec
+
+instance Show (LRTableA (Nullable (TableField tbl))) where
+  showsPrec = gshowsPrec
+
 instance Show (LRTableB Maybe) where
   showsPrec = gshowsPrec
+
+instance Show (LRTableB (TableField tbl)) where
+  showsPrec = gshowsPrec
+
+-- instance Show (LRDB (DatabaseEntity be LRDB)) where
+--   showsPrec = gshowsPrec
+
+-- deriving instance Show (TableSettings tbl) => Show (DatabaseEntityDescriptor be (TableEntity tbl))
+-- deriving instance Show (TableSettings tbl) => Show (DatabaseEntity be db (TableEntity tbl))
 
 instance Beamable LRTableA where
   zipBeamFieldsM = gzipBeamFieldsM
@@ -371,6 +574,9 @@ instance Table LRTableA where
 
 instance Beamable (PrimaryKey LRTableA) -- using standard derivation via GHC.Generics
 deriving instance Show (PrimaryKey LRTableA Maybe)
+deriving instance Show (PrimaryKey LRTableA (Nullable Maybe))
+deriving instance Show (PrimaryKey LRTableA (TableField tbl))
+deriving instance Show (PrimaryKey LRTableA (Nullable (TableField tbl)))
 
 instance Table LRTableB where
   data PrimaryKey LRTableB f = LRTableBKey (Columnar f Int)
@@ -379,6 +585,7 @@ instance Table LRTableB where
 
 instance Beamable (PrimaryKey LRTableB) -- using standard derivation via GHC.Generics
 deriving instance Show (PrimaryKey LRTableB Maybe)
+deriving instance Show (PrimaryKey LRTableB (TableField tbl))
 
 instance Database be LRDB where
   zipTables = gzipTables
@@ -394,7 +601,7 @@ ex1 =
     Nothing
     ([lr| MkLRTableA |] (Just 8) Nothing)
     (LRTableAKey (Just 11))
-    ([lr| MkLRTableA |] (Just (Just 8)) Nothing)
+    (LRTableAKey Nothing)
 
 ex2 :: LRTableB Maybe
 ex2 =
@@ -407,7 +614,10 @@ ex2 =
     (Just "foo")
     ([lr| MkLRTableA |] Nothing (Just 9))
     (LRTableAKey (Just 22))
-    ([lr| MkLRTableA |] (Just Nothing) (Just Nothing))
+    (LRTableAKey (Just Nothing))
 
 ex3 :: I (LRTableB Maybe)
 ex3 = zipBeamFieldsM (\ (Columnar' x) (Columnar' y) -> I (Columnar' (x <|> y))) ex1 ex2
+
+exDbSettings :: DatabaseSettings be LRDB
+exDbSettings = autoDbSettings
