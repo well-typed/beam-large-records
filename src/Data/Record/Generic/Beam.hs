@@ -32,6 +32,8 @@ import Control.Applicative
 import Data.Coerce
 import qualified GHC.Generics as GHC
 
+-- * Beamable
+
 -- | The generic code for the 'Beamable' class in beam-core distinguishes three different
 -- shapes of fields. Simple fields are applications of 'Columnar', mixins / foreign key references
 -- are references to other tables that are themselves 'Beamable', and nullable mixins are references
@@ -222,7 +224,97 @@ gtblSkeleton =
   in
     to (uncheckBeamFields e)
 
--- Example
+-- * Database
+
+data DatabaseField :: Type -> (Type -> Type) -> Type -> Type where
+  DatabaseEntityField :: (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> DatabaseField be f (Exposed tbl)
+
+combineDatabaseFields ::
+  forall be f g h m x.
+  (Applicative m)
+  => (forall tbl. (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> g tbl -> m (h tbl))
+  -> DatabaseField be f x -> DatabaseField be g x -> m (DatabaseField be h x)
+combineDatabaseFields combine (DatabaseEntityField f) (DatabaseEntityField g) = DatabaseEntityField <$> combine f g
+
+class CheckDatabaseField be (f :: Type -> Type) (tbl :: Type) where
+  type OriginalDatabaseType f tbl :: Type
+  checkDatabaseField :: OriginalDatabaseType f tbl -> DatabaseField be f tbl
+  uncheckDatabaseField :: DatabaseField be f tbl -> OriginalDatabaseType f tbl
+
+instance (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => CheckDatabaseField be f (Exposed tbl) where
+  type OriginalDatabaseType f (Exposed tbl) = f tbl
+  checkDatabaseField x = DatabaseEntityField x
+  uncheckDatabaseField (DatabaseEntityField x) = x
+
+type CheckDatabaseFields be f (db :: (Type -> Type) -> Type) = (Constraints (db Exposed) (CheckDatabaseField be f))
+
+newtype D f tbl = D { unD :: OriginalDatabaseType f tbl }
+
+dbExpose :: CheckDatabaseFields be f db => Rep I (db f) -> Rep (D f) (db Exposed)
+dbExpose = unsafeCoerce
+{-# NOINLINE dbExpose #-}
+
+dbUnexpose :: CheckDatabaseFields be f db => Rep (D f) (db Exposed) -> Rep I (db f)
+dbUnexpose = unsafeCoerce
+{-# NOINLINE dbUnexpose #-}
+
+checkDatabaseFields ::
+  forall be f db. (Generic (db Exposed), CheckDatabaseFields be f db)
+  => Rep I (db f) -> Rep (DatabaseField be f) (db Exposed)
+checkDatabaseFields = R.cmap (Proxy @(CheckDatabaseField be f)) (checkDatabaseField . unD) . dbExpose @be
+
+uncheckDatabaseFields ::
+  forall be f db. (Generic (db Exposed), CheckDatabaseFields be f db)
+  => Rep (DatabaseField be f) (db Exposed) -> Rep I (db f)
+uncheckDatabaseFields = dbUnexpose @be . R.cmap (Proxy @(CheckDatabaseField be f)) (D . uncheckDatabaseField)
+
+gzipTables ::
+  forall be db f g h m.
+  ( Applicative m
+  , Generic (db f)
+  , Generic (db g)
+  , Generic (db h)
+  , Generic (db Exposed)
+  , CheckDatabaseFields be f db
+  , CheckDatabaseFields be g db
+  , CheckDatabaseFields be h db
+  )
+  => Proxy be
+  -> (forall tbl. (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> g tbl -> m (h tbl))
+  -> db f -> db g -> m (db h)
+gzipTables _ combine f g =
+  to <$> gzipTables_Rep @be combine (from f) (from g)
+
+gzipTables_Rep ::
+  forall be db f g h m.
+  ( Applicative m
+  , Generic (db f)
+  , Generic (db g)
+  , Generic (db h)
+  , Generic (db Exposed)
+  , CheckDatabaseFields be f db
+  , CheckDatabaseFields be g db
+  , CheckDatabaseFields be h db
+  )
+  => (forall tbl. (IsDatabaseEntity be tbl, DatabaseEntityRegularRequirements be tbl) => f tbl -> g tbl -> m (h tbl))
+  -> Rep I (db f) -> Rep I (db g) -> m (Rep I (db h))
+gzipTables_Rep combine f g =
+  let
+    ef :: Rep (DatabaseField be f) (db Exposed)
+    ef = checkDatabaseFields f
+
+    eg :: Rep (DatabaseField be g) (db Exposed)
+    eg = checkDatabaseFields g
+
+    eh :: m (Rep (DatabaseField be h) (db Exposed))
+    eh = R.zipWithM (combineDatabaseFields combine) ef eg
+
+    h :: m (Rep I (db h))
+    h = uncheckDatabaseFields <$> eh
+  in
+    h
+
+-- * Example
 
 largeRecord defaultLazyOptions [d|
      data LRTableA (f :: Type -> Type) =
@@ -244,6 +336,14 @@ largeRecord defaultLazyOptions [d|
          , fldB7 :: LRTableA f
          , fldB8 :: PrimaryKey LRTableA f
          , fldB9 :: LRTableA (Nullable f)
+         }
+  |]
+
+largeRecord defaultLazyOptions [d|
+     data LRDB (f :: Type -> Type) =
+       MkLRDB
+         { tblA :: f (TableEntity LRTableA)
+         , tblB :: f (TableEntity LRTableB)
          }
   |]
 
@@ -271,6 +371,17 @@ instance Table LRTableA where
 
 instance Beamable (PrimaryKey LRTableA) -- using standard derivation via GHC.Generics
 deriving instance Show (PrimaryKey LRTableA Maybe)
+
+instance Table LRTableB where
+  data PrimaryKey LRTableB f = LRTableBKey (Columnar f Int)
+    deriving (GHC.Generic)
+  primaryKey = LRTableBKey . fldB1
+
+instance Beamable (PrimaryKey LRTableB) -- using standard derivation via GHC.Generics
+deriving instance Show (PrimaryKey LRTableB Maybe)
+
+instance Database be LRDB where
+  zipTables = gzipTables
 
 ex1 :: LRTableB Maybe
 ex1 =
