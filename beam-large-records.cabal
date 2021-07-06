@@ -6,11 +6,53 @@ maintainer:         andres@well-typed.com
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules:  Data.Record.Generic.Beam
-    build-depends:    base >= 4.13,
-                      beam-core,
-                      large-records,
-                      microlens,
-                      text
-    hs-source-dirs:   src
-    default-language: Haskell2010
+    exposed-modules:
+        Data.Record.Beam
+        -- Exposed for the sake of the tests
+        Data.Record.Beam.Internal
+    other-modules:
+        Data.Record.Beam.DbSettings
+        Data.Record.Beam.Interpretation
+        Data.Record.Beam.Skeleton
+        Data.Record.Beam.ZipFields
+        Data.Record.Beam.ZipTables
+    build-depends:
+        base >= 4.13
+      , beam-core
+      , large-records
+      , microlens
+      , text
+    hs-source-dirs:
+        src
+    default-language:
+        Haskell2010
+    ghc-options:
+        -Wall
+
+test-suite test-beam-large-records
+    type:
+        exitcode-stdio-1.0
+    main-is:
+        TestBeamLargeRecords.hs
+    other-modules:
+        Test.Record.Beam.Example1
+        Test.Record.Beam.Example2
+        Test.Record.Beam.Util.Orphans
+    build-depends:
+        base
+      , beam-core
+      , beam-large-records
+      , large-records
+      , record-hasfield
+      , tasty
+      , tasty-hunit
+    build-tool-depends:
+        record-dot-preprocessor:record-dot-preprocessor
+    hs-source-dirs:
+        test
+    default-language:
+        Haskell2010
+    other-extensions:
+        TemplateHaskell
+    ghc-options:
+        -Wall

@@ -1,2 +1,5 @@
 packages: ../large-records, .
 
+package beam-large-records
+  tests: True
+
