@@ -11,6 +11,7 @@ library
         -- Exposed for the sake of the tests
         Data.Record.Beam.Internal
     other-modules:
+        Data.Record.Beam.Constraints
         Data.Record.Beam.DbSettings
         Data.Record.Beam.Interpretation
         Data.Record.Beam.Skeleton
@@ -28,6 +29,7 @@ library
         Haskell2010
     ghc-options:
         -Wall
+        -Wredundant-constraints
 
 test-suite test-beam-large-records
     type:

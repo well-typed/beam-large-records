@@ -73,7 +73,7 @@ largeRecord defaultLazyOptions [d|
            fldB1 :: Columnar f Int
          , fldB2 :: Columnar f Int
          , fldB3 :: Columnar f Bool
-         , fldB4 :: Columnar f Char
+         , fldB4 :: Columnar (Nullable f) Char
          , fldB5 :: Columnar f Int
          , fldB6 :: Columnar f String
          , fldB7 :: LRTableA f
@@ -129,10 +129,11 @@ exDbSettings = autoDbSettings
 
 tests :: TestTree
 tests = testGroup "Test.Record.Beam.Example2" [
-      testCase "zipBeamFields"  test_zipBeamFields
-    , testCase "tblSkeleton"    test_tblSkeleton
-    , testCase "zipTables"      test_zipTables
-    , testCase "autoDbSettings" test_autoDbSettings
+      testCase "zipBeamFields"   test_zipBeamFields
+    , testCase "tblSkeleton"     test_tblSkeleton
+    , testCase "zipTables"       test_zipTables
+    , testCase "autoDbSettings"  test_autoDbSettings
+    , testCase "withConstraints" test_withConstraints
     ]
 
 test_zipBeamFields :: Assertion
@@ -150,7 +151,7 @@ test_zipBeamFields =
           fldB1 = Just 2
         , fldB2 = Just 2
         , fldB3 = Nothing
-        , fldB4 = Just 'x'
+        , fldB4 = Just (Just 'x')
         , fldB5 = Just 4
         , fldB6 = Nothing
         , fldB7 = MkLRTableA {
@@ -182,7 +183,7 @@ test_zipBeamFields =
           fldB1 = Just 2
         , fldB2 = Just 2
         , fldB3 = Nothing
-        , fldB4 = Just 'x'
+        , fldB4 = Just (Just 'x')
         , fldB5 = Just 4
         , fldB6 = Just "foo"
         , fldB7 = MkLRTableA {
@@ -295,4 +296,43 @@ test_autoDbSettings =
                    DatabaseDomainType Nothing "domTyp"
       } |]
 
+test_withConstraints :: Assertion
+test_withConstraints =
+    assertEqual "" (showTable canShowB) res
+  where
+    canShowB :: LRTableB (WithConstraint Show)
+    canShowB = gwithConstrainedFields ex
 
+    ex :: LRTableB Identity
+    ex = [lr| MkLRTableB {
+          fldB1 = 1
+        , fldB2 = 2
+        , fldB3 = False
+        , fldB4 = Just 'a'
+        , fldB5 = 4
+        , fldB6 = "b"
+        , fldB7 = MkLRTableA {
+                      fldA1 = 5
+                    , fldA2 = 6
+                    }
+        , fldB8 = LRTableAKey 7
+        , fldB9 = LRTableAKey (Just 8)
+        } |]
+
+    showTable :: Beamable tbl => tbl (WithConstraint Show) -> tbl (Const String)
+    showTable =
+        mapBeamFields $
+          \(Columnar' (WithConstraint x)) -> Columnar' (Const (show x))
+
+    res :: LRTableB (Const String)
+    res = [lr| MkLRTableB {
+          fldB1 = Const "1"
+        , fldB2 = Const "2"
+        , fldB3 = Const "False"
+        , fldB4 = Const "Just 'a'"
+        , fldB5 = Const "4"
+        , fldB6 = Const "\"b\""
+        , fldB7 = MkLRTableA {fldA1 = Const "5", fldA2 = Const "6"}
+        , fldB8 = LRTableAKey (Const "7")
+        , fldB9 = LRTableAKey (Const "Just 8")
+        } |]
