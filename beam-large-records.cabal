@@ -13,6 +13,7 @@ library
     other-modules:
         Data.Record.Beam.Constraints
         Data.Record.Beam.DbSettings
+        Data.Record.Beam.FromBackendRow
         Data.Record.Beam.Interpretation
         Data.Record.Beam.Skeleton
         Data.Record.Beam.ZipFields
@@ -39,15 +40,19 @@ test-suite test-beam-large-records
     other-modules:
         Test.Record.Beam.Example1
         Test.Record.Beam.Example2
+        Test.Record.Beam.SQLite
         Test.Record.Beam.Util.Orphans
     build-depends:
         base
       , beam-core
       , beam-large-records
+      , beam-sqlite
       , large-records
       , record-hasfield
+      , sqlite-simple
       , tasty
       , tasty-hunit
+      , text
     build-tool-depends:
         record-dot-preprocessor:record-dot-preprocessor
     hs-source-dirs:
