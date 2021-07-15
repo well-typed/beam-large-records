@@ -9,7 +9,8 @@
 {-# LANGUAGE UndecidableInstances  #-}
 
 module Data.Record.Beam.Constraints (
-    gwithConstraints
+    FieldsFulfillConstraint
+  , gwithConstraints
   , gwithConstrainedFields
   , WithConstraintsI
   , WithTblConstraints
@@ -20,32 +21,29 @@ import Data.Functor.Identity
 import Data.Kind
 import Data.Record.Generic
 import Data.Record.Generic.Transform
-import Database.Beam.Schema.Tables
+import Database.Beam.Schema.Tables hiding (FieldsFulfillConstraint)
 
 import qualified Data.Record.Generic.Rep as Rep
+import qualified Database.Beam.Schema.Tables as Beam
 
 import Data.Record.Beam.Interpretation
 
-gwithConstraints :: forall tbl c.
-     ( Generic (tbl (HasConstraint c))
-     , Generic (tbl Uninterpreted)
-     , Constraints (tbl Uninterpreted) (WithConstraintsI c)
-     , HasNormalForm (BeamInterpretation (HasConstraint c)) (tbl (HasConstraint c)) (tbl Uninterpreted)
-     )
+type FieldsFulfillConstraint c tbl = (
+    Generic (tbl (HasConstraint c))
+  , Generic (tbl Uninterpreted)
+  , Constraints (tbl Uninterpreted) (WithConstraintsI c)
+  , HasNormalForm (BeamInterpretation (HasConstraint c)) (tbl (HasConstraint c)) (tbl Uninterpreted)
+  )
+
+gwithConstraints :: forall c tbl.
+     FieldsFulfillConstraint c tbl
   => tbl (HasConstraint c)
 gwithConstraints =
     to . denormalize1 (Proxy @BeamInterpretation) $
       Rep.cpure (Proxy @(WithConstraintsI c)) withConstraintsI
 
 gwithConstrainedFields :: forall tbl c.
-     ( -- Constraints for 'zipBeamFieldsM'
-       Beamable tbl
-       -- Constraints for 'gwithConstraints'
-     , Generic (tbl (HasConstraint c))
-     , Generic (tbl Uninterpreted)
-     , Constraints (tbl Uninterpreted) (WithConstraintsI c)
-     , HasNormalForm (BeamInterpretation (HasConstraint c)) (tbl (HasConstraint c)) (tbl Uninterpreted)
-     )
+     (FieldsFulfillConstraint c tbl, Beamable tbl)
   => tbl Identity -> tbl (WithConstraint c)
 gwithConstrainedFields tbl = runIdentity $
     zipBeamFieldsM aux tbl gwithConstraints
@@ -100,12 +98,12 @@ instance ( -- Constraints from 'gwithConstraints'
 
 instance ( -- Constraints from 'withConstraints'
            Beamable tbl
-         , FieldsFulfillConstraint c tbl
+         , Beam.FieldsFulfillConstraint c tbl
          ) => WithTblConstraints c 'IsPrimaryKey (tbl Uninterpreted) where
   withTblConstraints _ = Interpret $ withConstraints
 
 instance ( -- Constraints from 'withNullableConstraints'
            Beamable tbl
-         , FieldsFulfillConstraintNullable c tbl
+         , Beam.FieldsFulfillConstraintNullable c tbl
          ) => WithTblConstraints c 'IsPrimaryKey (tbl (Nullable Uninterpreted)) where
   withTblConstraints _ = Interpret $ withNullableConstraints

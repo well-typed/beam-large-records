@@ -14,6 +14,7 @@ library
         Data.Record.Beam.Constraints
         Data.Record.Beam.DbSettings
         Data.Record.Beam.FromBackendRow
+        Data.Record.Beam.Insert
         Data.Record.Beam.Interpretation
         Data.Record.Beam.Skeleton
         Data.Record.Beam.ZipFields

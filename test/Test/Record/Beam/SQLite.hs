@@ -135,17 +135,12 @@ test_insert_select :: Assertion
 test_insert_select = runInMemory $ \conn -> do
     liftIO $ SQLite.execute_ conn $
       "CREATE TABLE db_large_table (table_id INT PRIMARY KEY NOT NULL, table_field VARCHAR NOT NULL);"
-    -- TODO: Temporary manual insert, until we have support for beam insert
-    liftIO $ SQLite.execute_ conn $
-      "INSERT INTO db_large_table VALUES (1, \"hi\");"
-    liftIO $ SQLite.execute_ conn $
-      "INSERT INTO db_large_table VALUES (2, \"ho\");"
 
---     runInsert $
---       insert exampleDb.exampleDbLargeTable $ insertValues [
---           large1
---         , large2
---         ]
+    runInsert $
+      insert exampleDb.exampleDbLargeTable $ LR.insertValues [
+          large1
+        , large2
+        ]
 
     allLarge <- runSelectReturningList $ select $
       orderBy_ (\x -> asc_ (x.largeTableId)) $ all_ exampleDb.exampleDbLargeTable
