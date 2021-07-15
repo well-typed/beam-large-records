@@ -1,2 +1,8 @@
-packages: ../large-records, .
+packages: .,
+  ../large-records,
+  ../beam/beam-core,
+  ../beam/beam-migrate,
+  ../beam/beam-sqlite
 
+package beam-large-records
+  tests: True
