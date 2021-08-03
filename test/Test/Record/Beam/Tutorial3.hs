@@ -60,9 +60,8 @@ largeRecord defaultPureScript [d|
          , productPrice       :: C f Int32 {- Price in cents -}
          }
        deriving (Show, Eq)
+       deriving anyclass (Beamable)
   |]
-
-instance Beamable ProductT
 
 instance Table ProductT where
   data PrimaryKey ProductT f = ProductId (Columnar f Int32)
@@ -101,6 +100,7 @@ largeRecord defaultPureScript [d|
           , orderShippingInfo  :: PrimaryKey ShippingInfoT (Nullable f)
           }
         deriving (Show, Eq)
+        deriving anyclass (Beamable)
 
       data ShippingInfoT (f :: * -> *) = ShippingInfo {
             shippingInfoId             :: Columnar f Int32
@@ -108,10 +108,8 @@ largeRecord defaultPureScript [d|
           , shippingInfoTrackingNumber :: Columnar f Text
           }
         deriving (Show, Eq)
+        deriving anyclass (Beamable)
     |]
-
-instance Beamable OrderT
-instance Beamable ShippingInfoT
 
 instance Table OrderT where
   data PrimaryKey OrderT f = OrderId (Columnar f Int32)
@@ -147,9 +145,8 @@ largeRecord defaultPureScript [d|
           , lineItemQuantity   :: Columnar f Int32
           }
         deriving (Show, Eq)
+        deriving anyclass (Beamable)
     |]
-
-instance Beamable LineItemT
 
 type LineItem = LineItemT Identity
 

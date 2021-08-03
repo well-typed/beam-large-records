@@ -42,7 +42,8 @@ largeRecord defaultPureScript $ [d|
             largeTableId    :: Columnar f Int32
           , largeTableField :: Columnar f Text
           }
-        deriving (Show, Eq)
+        deriving stock (Show, Eq)
+        deriving anyclass (Beamable)
     |]
 
 endOfBindingGroup
@@ -50,8 +51,6 @@ endOfBindingGroup
 large1, large2 :: LargeTable Identity
 large1 = [lr| MkLargeTable |] 1 "hi"
 large2 = [lr| MkLargeTable |] 2 "ho"
-
-instance Beamable LargeTable
 
 instance Table LargeTable where
   newtype PrimaryKey LargeTable f = LargeTableKey (Columnar f Int32)

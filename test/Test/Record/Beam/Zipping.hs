@@ -37,14 +37,14 @@ largeRecord defaultPureScript [d|
         , taMixin :: TableB f
         }
       deriving (Show, Eq)
+      deriving anyclass (Beamable)
 
     data TableB (f :: Type -> Type) = TableB {
           tbField :: Columnar f Char
         }
       deriving (Show, Eq)
+      deriving anyclass (Beamable)
   |]
-
-endOfBindingGroup
 
 instance Table TableA where
   data PrimaryKey TableA f = PrimA (Columnar f Int)
@@ -53,11 +53,10 @@ instance Table TableA where
 
   primaryKey ta = ta.taPrim
 
+endOfBindingGroup
+
 deriving instance Show (Columnar f Int) => Show (PrimaryKey TableA f)
 deriving instance Eq   (Columnar f Int) => Eq   (PrimaryKey TableA f)
-
-instance Beamable TableA
-instance Beamable TableB
 
 tests :: TestTree
 tests = testGroup "Test.Record.Beam.Zipping" [

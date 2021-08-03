@@ -48,12 +48,11 @@ largeRecord defaultLazyOptions [d|
            fldA1 :: Columnar f Int
          , fldA2 :: Columnar f Int
          }
-       deriving (Eq, Show)
+       deriving stock (Eq, Show)
+       deriving anyclass (Beamable)
   |]
 
 endOfBindingGroup
-
-instance Beamable LRTableA where
 
 instance Table LRTableA where
   newtype PrimaryKey LRTableA f = LRTableAKey (Columnar f Int)
@@ -81,12 +80,11 @@ largeRecord defaultLazyOptions [d|
          , fldB8 :: PrimaryKey LRTableA f
          , fldB9 :: PrimaryKey LRTableA (Nullable f)
          }
-       deriving (Eq, Show)
+       deriving stock (Eq, Show)
+       deriving anyclass (Beamable)
   |]
 
 endOfBindingGroup
-
-instance Beamable LRTableB
 
 instance Table LRTableB where
   data PrimaryKey LRTableB f = LRTableBKey (Columnar f Int)

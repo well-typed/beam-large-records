@@ -51,6 +51,7 @@ largeRecord defaultPureScript [d|
           , userPassword  :: Columnar f Text
           }
         deriving stock (Show, Eq)
+        deriving anyclass (Beamable)
     |]
 
 endOfBindingGroup
@@ -69,10 +70,6 @@ betty2 = [lr| User |] "betty@sims.com"   "Betty" "Sims"    "82b054bd83ffad9b6cf8
 james3 = [lr| User |] "james@oreily.com" "James" "O'Reily" "b4cc344d25a2efe540adbf2678e2304c"
 sam2   = [lr| User |] "sam@sophitz.com"  "Sam"   "Sophitz" "332532dcfaa1cbf61e2a266bd723612c"
 sam3   = [lr| User |] "sam@jely.com"     "Sam"   "Jely"    "332532dcfaa1cbf61e2a266bd723612c"
-
--- TODO: It'd be nice if we could use anyclass deriving here (and elsewhere)
--- <https://github.com/well-typed/large-records/issues/13>
-instance Beamable UserT
 
 instance Table UserT where
    data PrimaryKey UserT f = UserId (Columnar f Text)

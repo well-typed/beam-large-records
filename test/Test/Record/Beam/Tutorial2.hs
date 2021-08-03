@@ -65,11 +65,10 @@ largeRecord defaultPureScript [d|
           , addressForUser :: PrimaryKey UserT f
           }
         deriving (Show, Eq)
+        deriving anyclass (Beamable)
     |]
 
 endOfBindingGroup
-
-instance Beamable AddressT
 
 type Address   = AddressT Identity
 -- type AddressId = PrimaryKey AddressT Identity
