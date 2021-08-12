@@ -53,8 +53,6 @@ instance Table TableA where
 
   primaryKey ta = ta.taPrim
 
-endOfBindingGroup
-
 deriving instance Show (Columnar f Int) => Show (PrimaryKey TableA f)
 deriving instance Eq   (Columnar f Int) => Eq   (PrimaryKey TableA f)
 

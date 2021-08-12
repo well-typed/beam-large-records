@@ -52,8 +52,6 @@ largeRecord defaultLazyOptions [d|
        deriving anyclass (Beamable)
   |]
 
-endOfBindingGroup
-
 instance Table LRTableA where
   newtype PrimaryKey LRTableA f = LRTableAKey (Columnar f Int)
     deriving stock (GHC.Generic)
@@ -84,8 +82,6 @@ largeRecord defaultLazyOptions [d|
        deriving anyclass (Beamable)
   |]
 
-endOfBindingGroup
-
 instance Table LRTableB where
   data PrimaryKey LRTableB f = LRTableBKey (Columnar f Int)
     deriving stock (GHC.Generic)
@@ -111,8 +107,6 @@ largeRecord defaultLazyOptions [d|
          }
        deriving (Show, Eq)
   |]
-
-endOfBindingGroup
 
 instance Database be LRDB
 

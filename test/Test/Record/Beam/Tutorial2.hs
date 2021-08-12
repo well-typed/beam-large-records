@@ -68,8 +68,6 @@ largeRecord defaultPureScript [d|
         deriving anyclass (Beamable)
     |]
 
-endOfBindingGroup
-
 type Address   = AddressT Identity
 -- type AddressId = PrimaryKey AddressT Identity
 
@@ -105,8 +103,6 @@ largeRecord defaultPureScript [d|
            }
          deriving (Show, Eq)
     |]
-
-endOfBindingGroup
 
 instance Database be ShoppingCart2Db
 

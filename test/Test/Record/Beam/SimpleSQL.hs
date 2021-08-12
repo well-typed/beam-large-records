@@ -46,8 +46,6 @@ largeRecord defaultPureScript $ [d|
         deriving anyclass (Beamable)
     |]
 
-endOfBindingGroup
-
 large1, large2 :: LargeTable Identity
 large1 = [lr| MkLargeTable |] 1 "hi"
 large2 = [lr| MkLargeTable |] 2 "ho"

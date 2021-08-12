@@ -54,8 +54,6 @@ largeRecord defaultPureScript [d|
         deriving anyclass (Beamable)
     |]
 
-endOfBindingGroup
-
 type User   = UserT Identity
 type UserId = PrimaryKey UserT Identity
 
@@ -91,8 +89,6 @@ largeRecord defaultPureScript [d|
           }
         deriving (Show, Eq)
     |]
-
-endOfBindingGroup
 
 instance Database be ShoppingCartDb
 

@@ -173,8 +173,6 @@ largeRecord defaultPureScript [d|
           }
     |]
 
-endOfBindingGroup
-
 instance Database be ShoppingCart3Db
 
 {-------------------------------------------------------------------------------
