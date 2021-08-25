@@ -18,7 +18,7 @@ module Data.Record.Beam.Lenses (
 import Data.Proxy
 import Data.Record.Generic
 import Data.Record.Generic.GHC
-import Data.Record.Generic.Lens.Micro
+import Data.Record.Generic.Lens.VL
 import Data.Record.Generic.Transform
 import Database.Beam.Schema
 import Lens.Micro hiding (to)

@@ -29,7 +29,7 @@ import Data.Int
 import Data.Record.TH
 import Data.Text (Text)
 import Data.Time
-import Database.Beam
+import Database.Beam hiding (countAll_)
 import Database.Beam.Backend.SQL
 import Database.Beam.Sqlite
 import Lens.Micro
@@ -44,6 +44,7 @@ import Data.Record.Beam ()
 
 import Test.Record.Beam.Tutorial1 hiding (tests)
 import Test.Record.Beam.Tutorial2 hiding (tests)
+import Test.Record.Beam.Util.Compat
 import Test.Record.Beam.Util.SQLite
 
 {-------------------------------------------------------------------------------
@@ -548,7 +549,7 @@ test_SQL = runInMemory $ \conn -> do
 
     -- TODO: These numbers make no sense
     -- <https://github.com/haskell-beam/beam/issues/580>
-    let expectedShippingInformationByUser' :: [(User, Int, Int)]
+    let expectedShippingInformationByUser' :: [(User, Int32, Int32)]
         expectedShippingInformationByUser' = [
               (betty, 1, 1)
             , (james, 2, 1)
