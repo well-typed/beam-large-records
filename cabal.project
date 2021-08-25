@@ -1,8 +1,15 @@
-packages: .,
-  ../large-records,
-  ../beam/beam-core,
-  ../beam/beam-migrate,
-  ../beam/beam-sqlite
+packages: .
+
+source-repository-package
+  type: git
+  location: https://github.com/well-typed/large-records
+  tag: 97f1107e217a22180b19f9a7b78bded020f2c144
+
+source-repository-package
+  type: git
+  location: https://github.com/well-typed/beam
+  tag: 7127337b90700702487c1809f322a7c6721b65e5
+  subdir: beam-core
 
 package beam-large-records
   tests: True

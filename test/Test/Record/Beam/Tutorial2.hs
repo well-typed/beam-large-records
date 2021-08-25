@@ -29,7 +29,6 @@ module Test.Record.Beam.Tutorial2 (
   , AddressT(..)
   , Address
   , PrimaryKey(..)
-  , _construct_Address
   ) where
 
 import Data.Functor.Const

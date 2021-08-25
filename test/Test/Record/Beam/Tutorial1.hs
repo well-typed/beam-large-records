@@ -18,14 +18,14 @@ module Test.Record.Beam.Tutorial1 (
   , User
   , UserId
   , PrimaryKey(..)
-  , _construct_User
   ) where
 
 import Data.Functor.Identity
+import Data.Int
 import Data.Record.Beam ()
 import Data.Record.TH
 import Data.Text (Text)
-import Database.Beam hiding (Generic)
+import Database.Beam hiding (Generic, countAll_)
 import Database.Beam.Schema.Tables
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -34,6 +34,7 @@ import qualified Data.List.NonEmpty     as NE
 import qualified Database.SQLite.Simple as SQLite
 import qualified GHC.Generics           as GHC
 
+import Test.Record.Beam.Util.Compat
 import Test.Record.Beam.Util.SQLite
 import Test.Record.Beam.Util.Orphans ()
 
@@ -169,7 +170,7 @@ test_tutorial1_insertSelect = runInMemory $ \conn -> do
     -- Tutorial has Int32 here, but that doesn't typecheck
     -- Don't think that is related to beam-large-records though..?
     -- (Maybe due to beam version mismatch between tutorial and our beam branch.)
-    let userCount = aggregate_ (\_u -> as_ @Int countAll_) (all_ shoppingCartDb.shoppingCartUsers)
+    let userCount = aggregate_ (\_u -> as_ @Int32 countAll_) (all_ shoppingCartDb.shoppingCartUsers)
     Just c <- runSelectReturningOne $ select userCount
     liftIO $ assertEqual "userCount" 3 c
 
@@ -180,7 +181,7 @@ test_tutorial1_insertSelect = runInMemory $ \conn -> do
       , sam2
       , sam3
       ]
-    let numberOfUsersByName = aggregate_ (\u -> (group_ u.userFirstName, as_ @Int countAll_)) $
+    let numberOfUsersByName = aggregate_ (\u -> (group_ u.userFirstName, as_ @Int32 countAll_)) $
                               all_ shoppingCartDb.shoppingCartUsers
     countedByName <- runSelectReturningList $ select numberOfUsersByName
     liftIO $ assertEqual "countedByName" [("Betty",2), ("James",3), ("Sam",3)] countedByName
